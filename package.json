@@ -1,0 +1,15 @@
+{
+  "name": "get_defects_for_test_plan_or_run",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "getdefects": "node ./getDefectsForPlanOrRun.js"
+  },
+  "author": "",
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "axios": "^1.4.0"
+  }
+}
