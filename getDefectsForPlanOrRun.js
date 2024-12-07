@@ -13,6 +13,7 @@ import {
 let auth;
 const defectIds = [];
 const issuesData = [];
+const affectedTestCounts = [];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -55,29 +56,46 @@ async function getDefectsForRun(runId) {
   }
 
   allResults.forEach(result => {
-    const matchingResults = allResults.filter(res => res.test_id === result.test_id);
+    const matchingResults = allResults.filter(res => res.test_id === result.test_id && res.status_id);
     if (matchingResults.every(matchingResult => matchingResult.created_on <= result.created_on)) {
       lastResults.push(result);
     }
   })
 
-  const allDefectIds = lastResults
-      .map(result => result.defects)
-      .filter(defects => !!defects);
+  const cleanedLastResults = lastResults
+  .filter(result => !!result.defects)
+  .map(result => {
+    let cleanedResult = {...result};
+    cleanedResult.defects = result.defects.toUpperCase().replace(/[^A-Z-0-9,]/g, '');
+    return cleanedResult;
+  });
+
+  const allDefectIds = cleanedLastResults.map(result => result.defects);
   allDefectIds.forEach((defectId, index) => {
     if(defectId.includes(',')) {
       const separatedIds = defectId.split(',').filter(id => id);
-      allDefectIds[index] = separatedIds[0].trim();
+      allDefectIds[index] = separatedIds[0];
       for (let i = 1; i < separatedIds.length; i++) {
-        allDefectIds.push(separatedIds[i].trim());
+        allDefectIds.push(separatedIds[i]);
       }
     }
   });
-  allDefectIds.forEach(defectId => {
+  allDefectIds.forEach((defectId, index) => {
+    if (defectId.includes('NETBROWSE')) {
+      allDefectIds[index] = defectId.split('BROWSE').pop();
+      defectId = defectId.split('BROWSE').pop();
+    }
     if (!defectIds.includes(defectId) 
         && data.projectsToExclude.every(project => defectId.split('-')[0] !== project)) {
-      defectIds.push(defectId.trim());
+      defectIds.push(defectId);
     }
+  });
+
+  defectIds.forEach((defectId, index) => {
+    const testCount = cleanedLastResults
+      .filter(result => result.defects.includes(defectId)).length;
+    if (!affectedTestCounts[index]) affectedTestCounts[index] = 0;
+    affectedTestCounts[index] += +testCount;
   });
 
   if (data.singleRun) printDefectIds();
@@ -94,8 +112,7 @@ async function getDefectsForPlan() {
 }
 
 function printDefectIds() {
-  defectIds.sort();
-  defectIds.forEach(defectId => console.log(defectId));
+  defectIds.forEach((defectId, index) => console.log(`${defectId}  -> ${affectedTestCounts[index]}`));
   console.log(`-------------------\nTOTAL DEFECTS: ${defectIds.length}`);
 }
 
@@ -111,40 +128,68 @@ async function getIssuesData(issueIds) {
   }
 
   while (next) {
-    const response = await axios({
-      method: 'post',
-      url: '/search',
-      data: {
-        fields: [,
-          'priority',
-          'status',
-          'customfield_10057',
-          'summary',
-          'name',
-          'issuetype'
-        ],
-        jql: `key in (${issueIds.join(', ')})`,
-        startAt,
-        maxResults: 100,
-      },
-      auth,
-    });
+    let response;
+      response = await axios({
+        method: 'post',
+        url: '/search',
+        data: {
+          fields: [
+            'priority',
+            'status',
+            'customfield_10057',
+            'summary',
+            'name',
+            'issuetype'
+          ],
+          jql: `key in (${issueIds.join(', ')})`,
+          startAt,
+          maxResults: 100,
+        },
+        auth,
+      });
     if (response.data.issues.length) response.data.issues.forEach(issue => {
       const link = `${jiraBaseUrl.split('/rest')[0]}/browse/${issue.key}`;
       issuesData.push({
         id: issue.key,
+        affectedTests: -1,
         priority: issue.fields.priority.name,
         status: issue.fields.status.name,
-        devTeam: issue.fields.customfield_10057.value,
+        devTeam: issue.fields.customfield_10057 ? issue.fields.customfield_10057.value : 'N/A',
         summary: issue.fields.summary,
         type: issue.fields.issuetype.name,
         link,
+        oldId: '',
       });
     });
 
     startAt += 100;
     if (response.data.issues.length < 100) next = false;
   }
+
+  for (const [index, defectId] of defectIds.entries()) {
+    let targetIndex = issuesData.findIndex(issueData => defectId === issueData.id);
+    if (targetIndex < 0) {
+      let response;
+      try {
+        response = await axios({
+          method: 'get',
+          url: `/issue/${defectId}`,
+          auth,
+        });
+      } catch (error) {
+        console.log(`Could not find such issue in Jira: "${defectId}"`);
+        continue;
+      }
+      const issueIndex = issuesData.findIndex(issueData => issueData.id === response.data.key);
+      defectIds[index] = issuesData[issueIndex].id;
+      if (issuesData[issueIndex].oldId) issuesData[issueIndex].oldId += `, ${defectId}`
+      else issuesData[issueIndex].oldId = defectId;
+      targetIndex = issueIndex;
+    }
+    if (issuesData[targetIndex].affectedTests >= 0) issuesData[targetIndex].affectedTests = `${+issuesData[targetIndex].affectedTests + affectedTestCounts[index]}`;
+    else issuesData[targetIndex].affectedTests = `${affectedTestCounts[index]}`;
+  };
+
   printCountsByPriority();
 }
 
@@ -164,20 +209,20 @@ async function printCountsByPriority() {
   console.log(`(${outputString.slice(0, -2)})`);
 }
 
-
 async function saveIssuesData() {
   let fileString = '';
   const filename = `issues_for_test_${data.singleRun ? 'run' : 'plan'}_${data.testPlanOrRunId}.csv`;
   if (!issuesData.length) return;
 
   issuesData.sort((a, b) => {
-    if (a.id < b.id) return -1;
-    if (a.id > b.id) return 1;
+    if (+a.affectedTests > +b.affectedTests) return -1;
+    if (+a.affectedTests < +b.affectedTests) return 1;
     return 0;
   });
 
   fileString += Object.keys(issuesData[0]).join(',');
   issuesData.forEach((item) => {
+    if (item.affectedTests < 0) item.affectedTests = 'N/A';
     const values = Object.values(item);
     values.forEach((value, index) => {
       if (value.includes('\"')) values[index] = value.replaceAll('\"', '\"\"');

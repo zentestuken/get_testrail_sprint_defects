@@ -1,7 +1,7 @@
 export const data = {
   singleRun: false, // if true - `testPlanOrRunId` is a test run ID, else it is a test plan ID
   testPlanOrRunId: '',
-  runsToExclude: ['Critical Path', '1st'], // part of the name is enough (ignore if `singleRun` = true)
+  runsToExclude: ['Auto', 'Extra'], // part of the name is enough (ignore if `singleRun` = true)
   projectsToExclude: ['FAT'],
 }
 
