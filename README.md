@@ -1,6 +1,8 @@
 # Purpose
 Retrieves defects data for a FOLIO Testrail test plan/run fetching defect details from FOLIO Jira.
 
+Provides counts of affected test cases for each defect.
+
 # Requirements
 Node.js 18+
 
