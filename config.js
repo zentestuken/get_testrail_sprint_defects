@@ -1,6 +1,6 @@
 export const data = {
   singleRun: false, // if true - `testPlanOrRunId` is a test run ID, else it is a test plan ID
-  testPlanOrRunId: '2666',
+  testPlanOrRunId: '',
   runsToExclude: ['Auto'], // part of the name is enough (ignore if `singleRun` = true)
   projectsToExclude: ['FAT'],
   statusesToExclude: [ // ignore test cases with these statuses when gathering defect IDs 
