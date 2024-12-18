@@ -1,6 +1,5 @@
 # Purpose
 Retrieves defects data for a FOLIO Testrail test plan/run fetching defect details from FOLIO Jira.
-Provides counts of affected test cases for each defect.
 
 # Requirements
 Node.js 18+
@@ -13,6 +12,7 @@ Fill run parameters and credentials in `config.js`
 - `singleRun` - get results for a single test run instead of a test plan
 - `runsToExclude` - which test runs to ignore when retrieving data for a test plan
 - `projectsToExclude` - defects for which Jira projects to ignore
+- `statusesToExclude` - test cases with these statuses will be ignored
 
 # Output
 Results are saved as a CSV file in `/output` directory.

@@ -7,7 +7,7 @@ import {
   testRailAuth,
   jiraAuth,
   testRailBaseUrl,
-  jiraBaseUrl,
+  jiraBaseUrl
 } from './config.js';
 
 let auth;
@@ -58,9 +58,9 @@ async function getDefectsForRun(runId) {
   allResults.forEach(result => {
     const matchingResults = allResults.filter(res => res.test_id === result.test_id && res.status_id);
     if (matchingResults.every(matchingResult => matchingResult.created_on <= result.created_on)) {
-      lastResults.push(result);
+      if (!data.statusesToExclude.includes(result.status_id)) lastResults.push(result);
     }
-  })
+  });
 
   const cleanedLastResults = lastResults
   .filter(result => !!result.defects)

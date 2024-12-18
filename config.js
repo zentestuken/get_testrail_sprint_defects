@@ -1,8 +1,14 @@
 export const data = {
   singleRun: false, // if true - `testPlanOrRunId` is a test run ID, else it is a test plan ID
-  testPlanOrRunId: '',
-  runsToExclude: ['Auto', 'Extra'], // part of the name is enough (ignore if `singleRun` = true)
+  testPlanOrRunId: '2666',
+  runsToExclude: ['Auto'], // part of the name is enough (ignore if `singleRun` = true)
   projectsToExclude: ['FAT'],
+  statusesToExclude: [ // ignore test cases with these statuses when gathering defect IDs 
+    8, // Deferred
+    9, // Deferred Hot Fix
+    10, // Not Applicable
+    7 // Claimed
+  ]
 }
 
 export const testRailAuth = {
