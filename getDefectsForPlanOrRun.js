@@ -127,6 +127,8 @@ async function getIssuesData(issueIds) {
     return;
   }
 
+  issueIds = issueIds.filter(id => /^[A-Z]+-\d+$/.test(id));
+
   while (next) {
     let response;
       response = await axios({
