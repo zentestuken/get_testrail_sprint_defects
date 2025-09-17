@@ -120,7 +120,6 @@ async function getIssuesData(issueIds) {
   axios.defaults.baseURL= jiraBaseUrl;
   auth = jiraAuth;
   let next = true;
-  let startAt = 0;
 
   if (!issueIds.length) {
     console.log(`No referenced issues found for test ${data.singleRun ? 'run' : 'plan'} ${data.testPlanOrRunId}`);
@@ -128,27 +127,27 @@ async function getIssuesData(issueIds) {
   }
 
   issueIds = issueIds.filter(id => /^[A-Z]+-\d+$/.test(id));
-
+  
   while (next) {
     let response;
-      response = await axios({
-        method: 'post',
-        url: '/search',
-        data: {
-          fields: [
-            'priority',
-            'status',
-            'customfield_10057',
-            'summary',
-            'name',
-            'issuetype'
-          ],
-          jql: `key in (${issueIds.join(', ')})`,
-          startAt,
-          maxResults: 100,
-        },
-        auth,
-      });
+    const data = {
+      fields: [
+        'priority',
+        'status',
+        'customfield_10057',
+        'summary',
+        'name',
+        'issuetype'
+      ],
+      jql: `key in (${issueIds.join(', ')})`,
+      maxResults: 100,
+    };
+    response = await axios({
+      method: 'post',
+      url: '/search/jql',
+      data,
+      auth,
+    });
     if (response.data.issues.length) response.data.issues.forEach(issue => {
       const link = `${jiraBaseUrl.split('/rest')[0]}/browse/${issue.key}`;
       issuesData.push({
@@ -164,8 +163,8 @@ async function getIssuesData(issueIds) {
       });
     });
 
-    startAt += 100;
-    if (response.data.issues.length < 100) next = false;
+    if (response.data.isLast) next = false;
+    else data.nextPageToken = response.data.nextPageToken;
   }
 
   for (const [index, defectId] of defectIds.entries()) {
