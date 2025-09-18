@@ -17,14 +17,16 @@ const affectedTestCounts = [];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function getRunsForPlan() {
+const logTestRailFetchMessage = () => console.log('Fetching data from TestRail (may include duplicates - same tickets with different IDs)...');
+
+async function getRunsForPlan(planId) {
   axios.defaults.baseURL= testRailBaseUrl;
   auth = testRailAuth;
   const runIds = [];
 
   const response = await axios({
     method: 'get',
-    url: `/get_plan/${data.testPlanOrRunId}`,
+    url: `/get_plan/${planId}`,
     auth,
   });
   response.data.entries.forEach(entry => {
@@ -36,6 +38,7 @@ async function getRunsForPlan() {
 }
 
 async function getDefectsForRun(runId) {
+  if (data.singleRun) logTestRailFetchMessage();
   axios.defaults.baseURL= testRailBaseUrl;
   auth = testRailAuth;
   let next = true;
@@ -101,8 +104,9 @@ async function getDefectsForRun(runId) {
   if (data.singleRun) printDefectIds();
 }
 
-async function getDefectsForPlan() {
-  const runIds = await getRunsForPlan();
+async function getDefectsForPlan(planId) {
+  logTestRailFetchMessage();
+  const runIds = await getRunsForPlan(planId);
 
   for (const runId of runIds) {
     await getDefectsForRun(runId);
@@ -117,6 +121,7 @@ function printDefectIds() {
 }
 
 async function getIssuesData(issueIds) {
+  console.log('\nFetching data from Jira (required fields without duplicate tickets)...');
   axios.defaults.baseURL= jiraBaseUrl;
   auth = jiraAuth;
   let next = true;
@@ -127,25 +132,26 @@ async function getIssuesData(issueIds) {
   }
 
   issueIds = issueIds.filter(id => /^[A-Z]+-\d+$/.test(id));
+
+  const requestBody = {
+    fields: [
+      'priority',
+      'status',
+      'customfield_10057',
+      'summary',
+      'name',
+      'issuetype'
+    ],
+    jql: `key in (${issueIds.join(', ')})`,
+    maxResults: 100,
+  };
   
   while (next) {
     let response;
-    const data = {
-      fields: [
-        'priority',
-        'status',
-        'customfield_10057',
-        'summary',
-        'name',
-        'issuetype'
-      ],
-      jql: `key in (${issueIds.join(', ')})`,
-      maxResults: 100,
-    };
     response = await axios({
       method: 'post',
       url: '/search/jql',
-      data,
+      data: requestBody,
       auth,
     });
     if (response.data.issues.length) response.data.issues.forEach(issue => {
@@ -164,7 +170,7 @@ async function getIssuesData(issueIds) {
     });
 
     if (response.data.isLast) next = false;
-    else data.nextPageToken = response.data.nextPageToken;
+    else requestBody.nextPageToken = response.data.nextPageToken;
   }
 
   for (const [index, defectId] of defectIds.entries()) {
@@ -207,7 +213,7 @@ async function printCountsByPriority() {
     priorityCounts.push(issuesData.filter(issueData => issueData.priority === priority).length);
   });
   uniquePriorities.forEach((priority, index) => outputString += `${priority}: ${priorityCounts[index]}, `);
-  console.log(`(${outputString.slice(0, -2)})`);
+  console.log(`Issue counts by priority - ${outputString.slice(0, -2)}`);
 }
 
 async function saveIssuesData() {
@@ -234,14 +240,14 @@ async function saveIssuesData() {
     if (err)
       console.log(err);
     else {
-      console.log(`\nIssues saved to "${filename}".`);
+      console.log(`\nDONE! Issues saved to "${filename}".`);
     }
   });
 }
 
 (async () => {
   if (data.singleRun) await getDefectsForRun(data.testPlanOrRunId);
-  else await getDefectsForPlan();
+  else await getDefectsForPlan(data.testPlanOrRunId);
   await getIssuesData(defectIds);
   await saveIssuesData();
 })()
