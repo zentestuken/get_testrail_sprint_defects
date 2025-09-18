@@ -16,5 +16,8 @@ Fill run parameters and credentials in `config.js`
 - `projectsToExclude` - defects for which Jira projects to ignore
 - `statusesToExclude` - test cases with these statuses will be ignored
 
+# Run
+`npm run getdefects`
+
 # Output
 Results are saved as a CSV file in `/output` directory.
