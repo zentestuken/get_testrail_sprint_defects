@@ -1,6 +1,6 @@
 {
   "name": "get_defects_for_test_plan_or_run",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "",
   "main": "index.js",
   "type": "module",
