@@ -1,6 +1,6 @@
 export const data = {
   // ID of the test plan or test run to get defects from.
-  // Ignored if ID is passed as a command line argument: `node getDefectsForPlanOrRun.js 1234`
+  // Ignored if ID is passed as a command line argument: `npm run getdefects 1234`
   testPlanOrRunId: '',
   runsToExclude: ['Auto'], // part of the name is enough (not used if working with a single test run)
   projectsToExclude: ['FAT'], // ignore issues from these Jira projects
