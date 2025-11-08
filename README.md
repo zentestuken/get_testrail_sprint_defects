@@ -11,13 +11,17 @@ Node.js 18+
 
 # Configuration
 Fill run parameters and credentials in `config.js`
-- `singleRun` - get results for a single test run instead of a test plan
-- `runsToExclude` - which test runs to ignore when retrieving data for a test plan
+- `testPlanOrRunId` - ID of the test plan or test run to get defects from (ignored if ID provided in as CLI argument)
+- `runsToExclude` - which test runs (full/partial names) to ignore when retrieving data for a test plan
 - `projectsToExclude` - defects for which Jira projects to ignore
 - `statusesToExclude` - test cases with these statuses will be ignored
 
 # Run
-`npm run getdefects`
+`npm run getdefects`   _(test plan/run ID from config.js will be used)_
+
+OR
+
+`npm run getdefects 1234`   _(specify ID directly; provided ID overrides the one in config.js)_
 
 # Output
 Results are saved as a CSV file in `/output` directory.
