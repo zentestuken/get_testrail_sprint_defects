@@ -11,7 +11,7 @@ Node.js 18+
 
 # Configuration
 Fill run parameters and credentials in `config.js`
-- `testPlanOrRunId` - ID of the test plan or test run to get defects from (ignored if ID provided in as CLI argument)
+- `testPlanOrRunId` - ID of the test plan or test run to get defects from (ignored if ID provided as CLI argument)
 - `runsToExclude` - which test runs (full/partial names) to ignore when retrieving data for a test plan
 - `projectsToExclude` - defects for which Jira projects to ignore
 - `statusesToExclude` - test cases with these statuses will be ignored
