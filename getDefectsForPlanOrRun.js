@@ -10,14 +10,31 @@ import {
   jiraBaseUrl
 } from './config.js';
 
-let auth;
+const targetRunOrPlanId = process.argv[2] || data.testPlanOrRunId;
+
 const defectIds = [];
 const issuesData = [];
 const affectedTestCounts = [];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+let auth;
+let isSingleRun = false;
 
-const logTestRailFetchMessage = () => console.log('Fetching data from TestRail (may include duplicates - same tickets with different IDs)...');
+
+const logTestRailFetchMessage = () => console.log(`Fetching data for test ${isSingleRun ? 'run' : 'plan'} from TestRail (may include duplicates)...`);
+
+async function getDefectsFromTestRail(testPlanOrRunId) {
+  const runIds = await getRunsForPlan(testPlanOrRunId);
+  if (runIds === null) {
+    isSingleRun = true;
+    console.log(`Test plan with ID ${testPlanOrRunId} not found. Switching to single test run mode.`);
+    await getDefectsForRun(testPlanOrRunId);
+  } else {
+    await getDefectsForMultipleRuns(runIds);
+  };
+
+  printDefectIds();
+}
 
 async function getRunsForPlan(planId) {
   axios.defaults.baseURL= testRailBaseUrl;
@@ -28,7 +45,13 @@ async function getRunsForPlan(planId) {
     method: 'get',
     url: `/get_plan/${planId}`,
     auth,
+    validateStatus: () => true,
   });
+  if (response.data?.error && response.data.error.includes('not a valid test plan')) {
+    return null;
+  } else if (response.status > 299) {
+    throw new Error(`Error fetching test plan with ID ${planId} from TestRail: ${response.data}`);
+  }
   response.data.entries.forEach(entry => {
     if (data.runsToExclude.every(text => !entry.runs[0].name.includes(text))) {
       runIds.push(entry.runs[0].id);
@@ -38,7 +61,7 @@ async function getRunsForPlan(planId) {
 }
 
 async function getDefectsForRun(runId) {
-  if (data.singleRun) logTestRailFetchMessage();
+  if (isSingleRun) logTestRailFetchMessage();
   axios.defaults.baseURL= testRailBaseUrl;
   auth = testRailAuth;
   let next = true;
@@ -51,7 +74,16 @@ async function getDefectsForRun(runId) {
       method: 'get',
       url,
       auth,
+      validateStatus: () => true,
     });
+
+    if (response.data?.error && response.data.error.includes('not a valid test run')) {
+      console.error(`\n[ERROR!] Test run or plan with ID ${runId} not found in TestRail. Stopping further processing.`);
+      process.exit(1);
+    } else if (response.status > 299) {
+      throw new Error(`Error fetching results for test run with ID ${runId} from TestRail: ${response.data}`);
+    }
+
     allResults.push(...response.data.results);
 
     next = response.data._links.next;
@@ -100,19 +132,13 @@ async function getDefectsForRun(runId) {
     if (!affectedTestCounts[index]) affectedTestCounts[index] = 0;
     affectedTestCounts[index] += +testCount;
   });
-
-  if (data.singleRun) printDefectIds();
 }
 
-async function getDefectsForPlan(planId) {
+async function getDefectsForMultipleRuns(runIds) {
   logTestRailFetchMessage();
-  const runIds = await getRunsForPlan(planId);
-
   for (const runId of runIds) {
     await getDefectsForRun(runId);
   };
-
-  printDefectIds();
 }
 
 function printDefectIds() {
@@ -127,7 +153,7 @@ async function getIssuesData(issueIds) {
   let next = true;
 
   if (!issueIds.length) {
-    console.log(`No referenced issues found for test ${data.singleRun ? 'run' : 'plan'} ${data.testPlanOrRunId}`);
+    console.log(`No referenced issues found for test ${isSingleRun ? 'run' : 'plan'} ${targetRunOrPlanId}`);
     return;
   }
 
@@ -216,9 +242,9 @@ async function printCountsByPriority() {
   console.log(`Issue counts by priority - ${outputString.slice(0, -2)}`);
 }
 
-async function saveIssuesData() {
+function saveIssuesData() {
   let fileString = '';
-  const filename = `issues_for_test_${data.singleRun ? 'run' : 'plan'}_${data.testPlanOrRunId}.csv`;
+  const filename = `issues_for_test_${isSingleRun ? 'run' : 'plan'}_${targetRunOrPlanId}.csv`;
   if (!issuesData.length) return;
 
   issuesData.sort((a, b) => {
@@ -236,7 +262,7 @@ async function saveIssuesData() {
     })
     fileString += '\n"' +  values.join('","') + '"'
   })
-  await fs.writeFile(path.join(__dirname, `/output/${filename}`), fileString, {encoding: "utf8"}, (err) => {
+  fs.writeFile(path.join(__dirname, `/output/${filename}`), fileString, {encoding: "utf8"}, (err) => {
     if (err)
       console.log(err);
     else {
@@ -246,8 +272,7 @@ async function saveIssuesData() {
 }
 
 (async () => {
-  if (data.singleRun) await getDefectsForRun(data.testPlanOrRunId);
-  else await getDefectsForPlan(data.testPlanOrRunId);
+  await getDefectsFromTestRail(targetRunOrPlanId);
   await getIssuesData(defectIds);
-  await saveIssuesData();
+  saveIssuesData();
 })()
