@@ -166,7 +166,8 @@ async function getIssuesData(issueIds) {
       'customfield_10057',
       'summary',
       'name',
-      'issuetype'
+      'issuetype',
+      'customfield_10020'
     ],
     jql: `key in (${issueIds.join(', ')})`,
     maxResults: 100,
@@ -182,6 +183,10 @@ async function getIssuesData(issueIds) {
     });
     if (response.data.issues.length) response.data.issues.forEach(issue => {
       const link = `${jiraBaseUrl.split('/rest')[0]}/browse/${issue.key}`;
+      const latestSprintData = issue.fields.customfield_10020
+        ? issue.fields.customfield_10020.sort((a, b) => b.id - a.id)[0]
+        : null;
+      const sprint = latestSprintData ? `${latestSprintData.name} (${latestSprintData.state})` : 'N/A';
       issuesData.push({
         id: issue.key,
         affectedTests: -1,
@@ -192,6 +197,7 @@ async function getIssuesData(issueIds) {
         type: issue.fields.issuetype.name,
         link,
         oldId: '',
+        sprint,
       });
     });
 
